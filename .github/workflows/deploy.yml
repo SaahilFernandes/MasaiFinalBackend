@@ -1,0 +1,69 @@
+# This is the name of the workflow that will appear in the "Actions" tab of your GitHub repository.
+name: Build and Push Backend to AWS ECR
+
+# This section defines when the workflow should automatically run.
+on:
+  push:
+    # We are targeting only the 'main' branch. A push to any other branch will not trigger this workflow.
+    branches: [ "main" ]
+
+# Environment variables that are available to all jobs within this workflow.
+# This makes it easy to reference these values without repeating them.
+env:
+  # The AWS region where your ECR repository exists. It reads from the GitHub secret.
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  
+  # The full URI of your ECR repository. It also reads from the GitHub secret.
+  ECR_REPOSITORY_URI: ${{ secrets.AWS_ECR_REPOSITORY_URI }}
+
+# 'jobs' defines a sequence of tasks to be executed.
+jobs:
+  # We have one job named 'build-and-push'.
+  build-and-push:
+    name: Build and Push to ECR
+    # This specifies that the job will run on a fresh virtual machine hosted by GitHub, running the latest version of Ubuntu.
+    runs-on: ubuntu-latest
+
+    # 'steps' are the individual commands or actions that make up the job.
+    steps:
+      # Step 1: Check out the repository code
+      # This downloads your source code (including the Dockerfile) onto the virtual machine.
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Configure AWS credentials
+      # This action securely logs in to your AWS account using the temporary credentials
+      # stored as secrets in your GitHub repository settings.
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Step 3: Log in to Amazon ECR
+      # This step uses the credentials from the previous step to authenticate the Docker client
+      # on the virtual machine against your private Amazon ECR registry.
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Step 4: Build, tag, and push the image to Amazon ECR
+      # This is the core step where your Docker image is built and uploaded.
+      - name: Build, tag, and push image to ECR
+        id: build-image
+        run: |
+          # Define a unique tag for the Docker image. Using the Git commit hash (`github.sha`)
+          # is a best practice as it ensures every commit has a unique, traceable image version.
+          IMAGE_TAG=${{ github.sha }}
+          
+          # This command runs the 'docker build' process, just like you did locally.
+          # It tags the image with the ECR repository URI and the unique commit hash.
+          docker build -t $ECR_REPOSITORY_URI:$IMAGE_TAG .
+          
+          # This command uploads the built image to your private ECR repository.
+          docker push $ECR_REPOSITORY_URI:$IMAGE_TAG
+          
+          # This line is optional but useful. It prints the full image URI and tag,
+          # which can be seen in the workflow logs.
+          echo "Pushed image: $ECR_REPOSITORY_URI:$IMAGE_TAG"
