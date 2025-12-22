@@ -55,7 +55,23 @@ const registerForVehicle = async (req, res, next) => {
   }
 };
 
+const getMyVehicles = async (req, res, next) => {
+  try {
+    // Find all vehicles where the 'drivers' array contains the current user's ID
+    const vehicles = await Vehicle.find({ 
+      drivers: req.user._id,
+      isDeleted: false 
+    }).populate('owner', 'name');
+    
+    res.status(200).json(vehicles);
+  } catch (error) {
+    next(error);
+  }
+};
+// --- END NEW FUNCTION ---
+
 module.exports = {
   getAvailableVehicles,
   registerForVehicle,
+  getMyVehicles, // Export the new function
 };
