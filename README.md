@@ -418,7 +418,7 @@ For **each frontend application**, the following steps were performed in AWS S3:
 - Enabled **Static website hosting**
   - Index document: `index.html`
   - Error document: `index.html`
-<img width="1451" height="737" alt="image" src="https://github.com/user-attachments/assets/fc1ff922-35fc-424e-8f88-a3a5847f5db8" />
+<img width="1466" height="776" alt="image" src="https://github.com/user-attachments/assets/ec9827f7-c3f8-440b-a6d1-5103ed01616c" />
 
   
 - Applied a **public read bucket policy** to allow visitors to access the files
