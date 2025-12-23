@@ -66,6 +66,113 @@ EXPOSE 5001
 ENTRYPOINT ["/entrypoint.sh"]
 ```
 
+
+
+### Entrypoint Script
+
+An `entrypoint.sh` script was created to manage container startup:
+
+- Starts the Redis server in the background
+- Starts the Node.js application in the foreground
+
+This ensured both services run within the same container lifecycle.
+
+```bash
+#!/bin/sh
+
+# Start the Redis server in the background
+# The '--daemonize yes' flag tells Redis to run as a background process.
+redis-server --daemonize yes
+
+# Start the Node.js application in the foreground
+# 'exec' replaces the shell process with the Node process, which is a best practice
+# for container entrypoints as it ensures signals (like stop commands) are handled correctly.
+exec node server.js
+```
+
+### Local Build & Testing
+
+The image was built and tested locally:
+
+```bash
+docker build -t fleet-backend .
+docker run -p 5001:5001 -e VAR=value fleet-backend
+```
+## Phase B: Automation with GitHub Actions (CI/CD)
+
+After stabilizing the container, the build and deployment pipeline was fully automated using GitHub Actions.
+
+---
+
+### AWS IAM Setup
+
+- Created a dedicated **IAM User**
+- Assigned permission:
+  - `AmazonEC2ContainerRegistryPowerUser`
+- Generated secure credentials:
+  - `AWS_ACCESS_KEY_ID`
+  - `AWS_SECRET_ACCESS_KEY`
+  <img width="1470" height="711" alt="image" src="https://github.com/user-attachments/assets/7b9da00b-902a-4fd2-b34f-8e90f6cd9739" />
+
+---
+
+### Amazon ECR Repository
+
+- Created a private Amazon ECR repository:
+fleet-management-backend:
+  - Collected required details:
+  - Repository URI
+  - AWS Region
+<img width="1469" height="723" alt="image" src="https://github.com/user-attachments/assets/6b21da4e-6fc1-4f43-a3ac-c847e5385737" />
+
+
+---
+
+### GitHub Secrets:
+```bash
+# Server Configuration
+NODE_ENV=development
+PORT=5001
+
+# MongoDB Connection
+MONGO_URI=mongodb://127.0.0.1:27017/fleet-management-system
+
+# Access Token (short-lived)
+JWT_ACCESS_SECRET=your-very-strong-jwt-access-secret-key-123
+JWT_ACCESS_EXPIRES_IN=15m
+
+# Refresh Token (long-lived)
+JWT_REFRESH_Sc=your-very-strong-jwt-refresh-sc-key-456
+JWT_REFRESH_EXPIRES_IN=7d
+
+# Redis Configuration (for local instance)
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+
+# Email Configuration (using Mailtrap for development)
+EMAIL_HOST=sandbox.smtp.mailtrap.io  # <-- IMPORTANT: Use the new host
+EMAIL_PORT=2525
+EMAIL_USER=a5353ebcb91e43
+EMAIL_PASS=bd745c59f6c75e
+EMAIL_FROM="Fleet Management" <noreply@fleet.com>
+```
+<img width="1463" height="747" alt="image" src="https://github.com/user-attachments/assets/444ac247-6ec9-4f04-82cd-496d7a267b16" />
+
+---
+
+### CI/CD Workflow (`deploy.yml`)
+
+A GitHub Actions workflow was created to trigger automatically on every push to the `main` branch.
+
+The workflow performs the following steps:
+
+1. Authenticates with AWS using IAM credentials
+2. Logs in to Amazon ECR
+3. Builds the Docker image
+4. Tags the image using the Git commit hash
+5. Pushes the image to the ECR repository
+
+This ensures that **every commit produces a uniquely versioned, deployable backend image**.
 ### github actions workflow
 ```bash 
 
@@ -132,24 +239,125 @@ jobs:
           # which can be seen in the workflow logs.
           echo "Pushed image: $ECR_REPOSITORY_URI:$IMAGE_TAG"
 
-
-
-
 ```
 
-### Entrypoint Script
 
-An `entrypoint.sh` script was created to manage container startup:
+---
 
-- Starts the Redis server in the background
-- Starts the Node.js application in the foreground
+## Phase C: Infrastructure Setup & Deployment on AWS ECS
 
-This ensured both services run within the same container lifecycle.
+This phase involved a **one-time cloud infrastructure setup** to run the backend in a production environment.
 
-### Local Build & Testing
+---
 
-The image was built and tested locally:
+### Database Setup (MongoDB Atlas)
 
-```bash
-docker build -t fleet-backend .
-docker run -p 5001:5001 -e VAR=value fleet-backend
+- Local MongoDB could not be accessed from the cloud environment
+- Created a **MongoDB Atlas free-tier cluster**
+- Generated a cloud-based connection URI
+- Configured network access to allow inbound connections
+<img width="1459" height="875" alt="image" src="https://github.com/user-attachments/assets/0168e0d0-0c7f-40ec-8bbf-2274ddd0d994" />
+
+
+---
+
+### Networking (VPC)
+
+- Used the AWS **Default VPC** for simplicity
+- Avoided custom subnet configuration to speed up deployment
+
+---
+
+### Security Group
+Created a security group:
+fleet-mgmt-sg-default
+
+Configured inbound rules to:
+
+- Allow traffic from the **Application Load Balancer**
+- Allow traffic on backend port `5001`
+<img width="1462" height="711" alt="image" src="https://github.com/user-attachments/assets/13e5904c-a35e-4401-b0e2-92b283d5f5e3" />
+
+---
+
+### ECS Cluster
+
+- Created an ECS cluster:
+fleet-management-cluster
+
+- Launch type:
+- **AWS Fargate** (serverless container execution)
+<img width="1455" height="687" alt="image" src="https://github.com/user-attachments/assets/1f8ed09b-bac9-4843-a13b-b62d164877f0" />
+
+
+---
+
+### ECS Task Definition
+
+Configured the ECS task definition with:
+
+- Full Amazon ECR image URI and tag
+- CPU and memory allocation
+- Environment variables:
+- MongoDB Atlas URI
+- Redis configuration
+- Application secrets
+<img width="1461" height="808" alt="image" src="https://github.com/user-attachments/assets/5b4f9a74-b6c1-40e2-94c6-774d208c052a" />
+
+
+---
+
+### ECS Service & Load Balancer
+
+Created an ECS service:
+fleet-management-service
+
+
+Key features:
+
+- Runs a single container instance
+- Automatically provisions an **Application Load Balancer (ALB)**
+- Exposes a public backend URL
+- Continuously monitors container health and restarts on failure
+<img width="1464" height="715" alt="image" src="https://github.com/user-attachments/assets/99ce4fae-9511-4d6c-b3d0-761ddb3f8b31" />
+
+---
+
+### Debugging & Finalization
+
+Issues encountered and resolved during deployment:
+
+- `CannotPullContainerError`
+- Request timeouts
+- Unhealthy target group
+
+Resolution steps included:
+
+- Inspecting stopped ECS tasks
+- Reviewing logs in **CloudWatch**
+- Correcting image URI, IAM permissions, and security group rules
+
+---
+
+### Final State
+
+- ECS target group status: **Healthy**
+- Backend API is **publicly accessible** and production-ready
+<img width="1462" height="722" alt="image" src="https://github.com/user-attachments/assets/3921d430-0060-48aa-be88-bcea23d94a7b" />
+
+
+## Part 2 & 3: Deploying the Frontend Applications (Amazon S3)
+
+Once the backend was live and publicly accessible via the **Application Load Balancer (ALB) DNS URL**, deploying the frontend applications became a simpler and repeatable process.
+
+Both frontend applications were deployed as **static websites** using **Amazon S3**.
+
+---
+
+### Frontend Applications
+
+- **Frontend 1:** Next.js User Application  
+- **Frontend 2:** React Admin Portal  
+
+---
+
