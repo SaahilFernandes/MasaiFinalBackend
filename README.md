@@ -361,3 +361,95 @@ Both frontend applications were deployed as **static websites** using **Amazon S
 
 ---
 
+### Configuration
+
+For both frontend projects, the environment configuration was updated to point to the live backend API.
+
+- Updated environment variable files:
+  - Next.js: `.env.local`
+  - React: `.env`
+
+- Changed API base URL from:
+  NEXT_PUBLIC_API_URL= http://localhost:5001/api
+to:
+   NEXT_PUBLIC_API_URL= http://fleet-mgmt-alb-default-1630791645.eu-north-1.elb.amazonaws.com/api
+
+
+- **Frontend 1:** Next.js User Application  
+- **Frontend 2:** React Admin Portal  
+
+This ensured all API requests from the frontend hit the production backend.
+
+---
+
+### Build Process
+
+Each application was built locally to generate static assets.
+
+- **Next.js User App**
+```bash
+npm run build
+```
+Output:
+
+out/
+
+-**React Admin Portal**
+```bash
+npm run build
+```
+Output:
+
+dist/
+
+
+---
+## Amazon S3 Bucket Setup (Performed Twice)
+
+For **each frontend application**, the following steps were performed in AWS S3:
+
+- Created a new **globally unique S3 bucket**
+<img width="1461" height="647" alt="image" src="https://github.com/user-attachments/assets/e0fbc57a-cc65-403f-ba4e-48e483be7e75" />
+
+- Disabled **“Block all public access”**
+
+<img width="1470" height="777" alt="image" src="https://github.com/user-attachments/assets/4ebe4b67-8efe-48c4-92ce-62b63b6b739f" />
+
+- Enabled **Static website hosting**
+  - Index document: `index.html`
+  - Error document: `index.html`
+<img width="1451" height="737" alt="image" src="https://github.com/user-attachments/assets/fc1ff922-35fc-424e-8f88-a3a5847f5db8" />
+
+  
+- Applied a **public read bucket policy** to allow visitors to access the files
+<img width="1453" height="719" alt="image" src="https://github.com/user-attachments/assets/70c9420d-077d-45c6-940b-0918667b76e4" />
+
+
+
+---
+
+## Upload & Deployment
+
+For each frontend application:
+
+- Uploaded the contents of the build folder directly to the **root of the S3 bucket**:
+  - Next.js → `out/`
+  - <img width="1176" height="687" alt="image" src="https://github.com/user-attachments/assets/b92045ca-538e-4a0b-b060-ac2f6bf78661" />
+
+  - React → `dist/`
+  - <img width="1177" height="592" alt="image" src="https://github.com/user-attachments/assets/3972c5c4-7476-4b98-9070-aca6b8f1f491" />
+
+- Used drag-and-drop via the AWS S3 Console
+
+Once uploaded, each application became accessible via its **S3 Static Website Endpoint**.
+
+---
+
+## ✅ Result
+
+- Both frontend applications deployed as **static websites**
+- Successfully integrated with the **live backend API**
+- Highly scalable and **low-cost hosting** using Amazon S3
+- Simple, repeatable, and production-ready deployment process
+
+
